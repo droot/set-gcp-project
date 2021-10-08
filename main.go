@@ -13,8 +13,8 @@ import (
 )
 
 var (
-	reRole    = regexp.MustCompile(`serviceAccount:(.+)\.svc.(.*)`)
-	gcpRoleRe = regexp.MustCompile(`(.*)@(.*)\.iam\.gserviceaccount\.com`)
+	workloadRoleMemberRe = regexp.MustCompile(`serviceAccount:(.+)\.svc.(.*)`)
+	gcpRoleMemberRe      = regexp.MustCompile(`(.*)@(.*)\.iam\.gserviceaccount\.com`)
 )
 
 func main() {
@@ -63,16 +63,15 @@ func processResource(r *yaml.RNode, projectID string) error {
 	member := yaml.GetValue(specNode.Value.Field("member").Value)
 	switch role {
 	case "roles/iam.workloadIdentityUser":
-		// r.PipeE(yaml.SetAnnotation("found-workload", projectID))
-		roleMatches := reRole.FindSubmatch([]byte(member))
-		memberValue := fmt.Sprintf("serviceAccount:%s.svc.%s", projectID, roleMatches[2])
+		matches := workloadRoleMemberRe.FindSubmatch([]byte(member))
+		memberValue := fmt.Sprintf("serviceAccount:%s.svc.%s", projectID, matches[2])
 		_, err = r.Pipe(
 			yaml.PathGetter{Path: []string{"spec"}},
 			yaml.FieldSetter{Name: "member", Value: yaml.NewStringRNode(memberValue)})
 		return err
 	case "roles/source.reader":
-		gcpRoleMatches := gcpRoleRe.FindSubmatch([]byte(member))
-		memberValue := fmt.Sprintf("%s@%s.iam.gserviceaccount.com", gcpRoleMatches[1], projectID)
+		matches := gcpRoleMemberRe.FindSubmatch([]byte(member))
+		memberValue := fmt.Sprintf("%s@%s.iam.gserviceaccount.com", matches[1], projectID)
 		_, err = r.Pipe(
 			yaml.PathGetter{Path: []string{"spec"}},
 			yaml.FieldSetter{Name: "member", Value: yaml.NewStringRNode(memberValue)})
